@@ -1,3 +1,6 @@
+# Programmable Benchtop Power Supply
+This project allows a user to adjust a 24V DC voltage through a 0-24V range and set a current limit. 
+
 <img width="1800" height="1250" alt="image" src="https://github.com/user-attachments/assets/fbb9343b-7ca9-4289-bfdf-ba0c06b9bf94" />
 <img width="1800" height="1250" alt="image" src="https://github.com/user-attachments/assets/a0fac11b-53fe-4454-bd4f-d93c5b3ab89d" />
 <img width="1800" height="1250" alt="image" src="https://github.com/user-attachments/assets/eb22f447-e032-4125-9be2-4eb99aa5c736" />
