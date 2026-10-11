@@ -23,7 +23,7 @@
 #define ON_OFF_LED PIN2_bm
 #define VSET_LED   PIN3_bm
 #define CSET_LED   PIN4_bm
-#define LED_MASK   00011111 
+#define LED_MASK   0b00011111   // was 00011111, which C reads as octal
 
 /*shift register buffer*/
 uint8_t curr = 0b00000000;
@@ -149,4 +149,12 @@ void CSET_ON(void){
 	shiftReg_SendData(curr);
 
 }
-
+/*
+-----------------------------------------------------------
+	Description: Turns off VSET and CSET LEDs (leaving edit mode)
+------------------------------------------------------------
+*/
+void SET_LEDS_OFF(void){
+	curr &= ~(VSET_LED | CSET_LED);
+	shiftReg_SendData(curr);
+}

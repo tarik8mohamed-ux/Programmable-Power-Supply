@@ -15,7 +15,7 @@
 
 #define SPI_CTRLA_INITIALIZER   0b00110001
 #define SPI0_CTRLB_INITIALIZER  0b00000101
-#define SPI_INTCTRL_INITIALIZER 0b00000001
+#define SPI_INTCTRL_INITIALIZER 0b00000000   // no SPI interrupts (there is no ISR)
 #define SPIROUTEA_INITIALIZER   0b00000000
 
 /* 
@@ -42,8 +42,8 @@ void SPI_init(void){
 ----------------------------------------------------------------
 */
 void SPI0_SendData(uint8_t Data){
-	
-	if(SPI0.INTFLAGS == DATA_REG_OPEN) SPI0.DATA = Data;
-	//MAYBE ADD _delay_us(1) AS THE ELSE IF IT HELPS	
+	SPI0.DATA = Data;                          // start the transfer
+	while (!(SPI0.INTFLAGS & SPI_IF_bm));      // wait until all 8 bits are out
+	(void)SPI0.DATA;                           // read DATA to clear the flag
 }
 

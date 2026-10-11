@@ -18,7 +18,7 @@
 #include "SHIFT_REGISTER_MOD.h"
 #include "ROT_ENCODER_MOD.h"
 #include "BUFFER_MOD.h"
-
+#include "SPI_MOD.h"
 
 #define STATE_INITIAL 0
 #define STATE_IDLE    1
@@ -29,11 +29,100 @@
 int CURRENT_STATE = STATE_INITIAL;
 char tempbuff[4] = {'0','0','0','0'};
 	
-PORTF.DIR = 0x00;
-PORTE.DIR = 0x00;
-PORTA.DIR = 0xFF;
-//PORT C & D are handled by Keypad and LCD modules 
+//HELPER FUNCTIONS
+
+
+/* 
+---------------------------------------------------------------
+	Description: Returns state based on button status
 	
+	Inputs:
+		int current_state: the current state of the program
+----------------------------------------------------------------
+*/
+#define BUTTONS (PIN2_bm | PIN3_bm)
+
+int button_to_state(int current_state){
+	static uint8_t stable = BUTTONS;              // both released (pulled high)
+	uint8_t now = PORTF.IN & BUTTONS;
+	uint8_t pressed = 0;
+
+	if (now != stable) {                          // a button changed
+		_delay_ms(20);                            // let the contacts stop bouncing
+		if ((PORTF.IN & BUTTONS) == now) {        // still the same: real change
+			pressed = stable & ~now;              // high-to-low = new press
+			stable = now;
+		}
+	}
+
+	if (pressed & PIN2_bm){                       // ON/OFF BUTTON
+		if(current_state != STATE_IDLE) return STATE_IDLE;
+		else return STATE_ACTIVE;
+	}
+	if ((pressed & PIN3_bm) && current_state != STATE_IDLE){  // VSET/CSET BUTTON
+		if(current_state != STATE_VSET) return STATE_VSET;
+		else return STATE_CSET;
+	}
+	return current_state;
+}
+
+
+/* 
+---------------------------------------------------------------
+	Description: executes operation based on user entry
+	
+	Inputs:
+		char buttonPressed: button user has pressed
+		int mode: Operation done to Vset-->1, Cset-->0
+----------------------------------------------------------------
+*/
+void user_operation(char buttonPressed, int mode){
+	int state = key_state(buttonPressed);
+	switch(state){
+		case (1):
+			lcd_insert(buttonPressed, mode);
+			break;
+		
+		case (2):
+			lcd_del(mode);
+			break;
+		
+		case (3):
+			CURRENT_STATE = STATE_ACTIVE;
+			break;
+			
+		case(4):
+			CURRENT_STATE = STATE_ACTIVE;
+			buffer_copy(tempbuff, Vbuffer);	
+			break;	
+			
+	}
+}
+
+/*
+---------------------------------------------------------------
+	Description: One-time hardware setup. Call first in main().
+	PORT C & D are handled by Keypad and LCD modules
+----------------------------------------------------------------
+*/
+static void hw_init(void){
+	/* Port A: PA0-2 shift register, PA3 LDAC, PA4 MOSI, PA5 MISO/CLR, PA6 SCK, PA7 SYNC */
+	PORTA.OUTSET = PIN7_bm;                 // DAC SYNC idles high
+	PORTA.OUTCLR = PIN3_bm;                 // DAC LDAC low: outputs update on every write
+	PORTA.DIR    = 0xFF & ~PIN5_bm;         // all outputs except PA5
+	PORTA.PIN5CTRL = PORT_PULLUPEN_bm;      // holds the DAC's CLR pin high
+
+	/* Port F: PF0/PF1 analog monitors, PF2 ON/OFF button, PF3 VSET/CSET button */
+	PORTF.DIR = 0x00;
+	PORTF.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc;   // analog pins: no digital input
+	PORTF.PIN1CTRL = PORT_ISC_INPUT_DISABLE_gc;
+	PORTF.PIN2CTRL = PORT_PULLUPEN_bm;      // buttons pull the pin to GND when pressed
+	PORTF.PIN3CTRL = PORT_PULLUPEN_bm;
+
+	encoder_init();                         // Port E inputs
+	SPI_init();
+	ADC_init(0);                            // 0 = single-ended
+}
 
 /* POTENITIAL PROBELMS
 1. Power off does not work inside set states
@@ -41,6 +130,7 @@ PORTA.DIR = 0xFF;
 
 int main(void)
 {
+	hw_init();
 	//int CURRENT_STATE = STATE_INITIAL;
 	//char tempbuff[4] = {'0','0','0','0'};
 
@@ -77,7 +167,7 @@ int main(void)
 				
 				//get val of Vmon and Cmon
 				ADC_channelSEL(VMON_bm);
-				Vmon = ADC_read();
+				Vmon = ADC_read() * 10.0f;   // 9k/1k divider: pin sees Vout/10
 				ADC_channelSEL(CMON_bm);
 				Cmon = ADC_read();
 				
@@ -110,7 +200,7 @@ int main(void)
 				
 				while(1){
 					Coordinate user_input = scan_key(); 
-					if (user_input[0] != 5){ // {5,5} is the junk output if no button is pressed
+					if (user_input.row != 5){ // {5,5} is the junk output if no button is pressed
 						char buttonPressed= keypad_pressed(user_input);
 						user_operation(buttonPressed, 1);
 						if (CURRENT_STATE != STATE_VSET) break;
@@ -119,8 +209,11 @@ int main(void)
 				}
 				
 				Vset = buffer_to_val(Vbuffer);
+				if (Vset > VSET_MAX) Vset = VSET_MAX;   // keypad allows up to 99.99
+				val_to_buffer(Vbuffer, Vset);           // show the clamped value
 				lcd_buffer_to_address(Vbuffer, VAddresses, DISPLAY_MODE);
 				dac_Vset(Vset);
+				SET_LEDS_OFF();
 				break;
 			
 			
@@ -134,7 +227,7 @@ int main(void)
 				
 				while(1){
 					Coordinate user_input = scan_key();
-					if (user_input[0] != 5){ // {5,5} is the junk output if no button is pressed
+					if (user_input.row != 5){ // {5,5} is the junk output if no button is pressed
 						char buttonPressed= keypad_pressed(user_input);
 						user_operation(buttonPressed, 0);
 						if (CURRENT_STATE != STATE_CSET) break;
@@ -142,8 +235,11 @@ int main(void)
 				}
 				
 				Cset = buffer_to_val(Cbuffer);
+				if (Cset > CSET_MAX) Cset = CSET_MAX;
+				val_to_buffer(Cbuffer, Cset);
 				lcd_buffer_to_address(Cbuffer, CAddresses, DISPLAY_MODE);
 				dac_Cset(Cset);
+				SET_LEDS_OFF();
 				break;
 		}
 	}
@@ -151,62 +247,3 @@ int main(void)
 
 /*
 -------------------------------------------------------------------------------------------------------------------------------
-HELPER FUNCTIONS
-*/
-
-
-/* 
----------------------------------------------------------------
-	Description: Returns state based on button status
-	
-	Inputs:
-		int current_state: the current state of the program
-----------------------------------------------------------------
-*/
-int button_to_state(int current_state){
-	if (PORTF.IN &~ PIN2_bm){ // ON/OFF BUTTON
-		if(current_state != STATE_IDLE) return STATE_IDLE;
-		else return STATE_ACTIVE;
-	}
-	
-	else if (PORTF.IN &~ PIN3_bm && current_state!=STATE_IDLE){  // VSET/CSET BUTTON
-		if(current_state != STATE_VSET) return STATE_VSET;
-		else return STATE_CSET;
-	}
-	
-	else return current_state;
-	
-}
-
-
-/* 
----------------------------------------------------------------
-	Description: executes operation based on user entry
-	
-	Inputs:
-		char buttonPressed: button user has pressed
-		int mode: Operation done to Vset-->1, Cset-->0
-----------------------------------------------------------------
-*/
-void user_operation(char buttonPressed, int mode){
-	int state = key_state(buttonPressed);
-	switch(state){
-		case (1):
-			lcd_insert(buttonPressed, mode);
-			break;
-		
-		case (2):
-			lcd_del(mode);
-			break;
-		
-		case (3):
-			CURRENT_STATE = STATE_ACTIVE;
-			break;
-			
-		case(4):
-			CURRENT_STATE = STATE_ACTIVE;
-			buffer_copy(tempbuff, Vbuffer);	
-			break;	
-			
-	}
-}

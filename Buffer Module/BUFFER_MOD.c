@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <avr/interrupt.h>
 #include <string.h>
+#include "BUFFER_MOD.h"
 
 int LEFT_SHIFT = 1;
 int RIGHT_SHIFT = 0;
@@ -64,7 +65,7 @@ double buffer_to_val(char buffer[4]){
 	double val = 0;
 	double factor = 10;
 	for (int pos=0; pos<4; pos++){
-		val = val + (factor) * (buffer[pos]);
+		val = val + (factor) * (buffer[pos] - '0');   // '7' -> 7
 		factor = factor/10;
 	}
 	

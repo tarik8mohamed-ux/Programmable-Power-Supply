@@ -50,7 +50,7 @@
 uint8_t const VAddresses[4] = {0x00, 0x01, 0x03, 0x04};
 uint8_t const CAddresses[4] = {0x40, 0x41, 0x43, 0x44};
 uint8_t const VmonAddresses[4] = {0x0A, 0x0B, 0x0D, 0x0E};
-uint8_t const CmonAddresses[4] = {0x4A, 0x4B, 0x4D, 0x4E}
+uint8_t const CmonAddresses[4] = {0x4A, 0x4B, 0x4D, 0x4E};
 
 /* Default shifter char */
 #define DEFAULT_C '0'
@@ -67,7 +67,7 @@ uint8_t const CmonAddresses[4] = {0x4A, 0x4B, 0x4D, 0x4E}
 void lcd_write_instruction_helper(uint8_t nibble){	
 
 	//This function enacts the timing diagram for sending INSTRUCTIONS(not data)
-	_delay_ms(5);
+	_delay_us(50);	// most instructions finish in ~40 us
 	// On the data sheet, RW & RS must be 0 to send a command to the lcd
 	LCD_RW_PORT.OUT &= ~LCD_RW_PIN;	// write mode
 	LCD_RS_PORT.OUT &= ~LCD_RS_PIN;	// instruction reg
@@ -147,8 +147,10 @@ void lcd_init(void)
 	lcd_write_instruction(DISPLAY_OFF);
 	lcd_write_instruction(DISPLAY_ON);
 	lcd_write_instruction(CLEAR_DISPLAY);
+	_delay_ms(2);	// clear takes ~1.5 ms
 	lcd_write_instruction(ENTRY_MODE_SET);
 	lcd_write_instruction(RETURN_HOME);
+	_delay_ms(2);	// home takes ~1.5 ms
 }
 
 
@@ -181,7 +183,7 @@ void lcd_write_char(char letter)
 	uint8_t curr_nibble = high_nibble;
 	
 	for(int i=0; i<2; i++){
-		_delay_ms(50);
+		_delay_us(50);	// was 50 ms: each character took 100 ms
 		LCD_RW_PORT.OUT &= ~LCD_RW_PIN;	// write mode
 		LCD_RS_PORT.OUT |= LCD_RS_PIN;	// data reg
 	
@@ -232,16 +234,14 @@ void lcd_write_string (uint8_t line, char* str)
 		int mode: ENTRY_MODE or DISPLAY_MODE, for leading zeros
 ------------------------------------------------------------------------------
 */
-void lcd_buffer_to_address(char buffer[4], uint8_t addresses[4] ,int mode){
+void lcd_buffer_to_address(char buffer[4], const uint8_t addresses[4], int mode){
 
 	for(int pos=0; pos<4; pos++){
-		
-		if !(mode==DISPLAY_MODE && pos==0 && buffer[pos]=='0'){ //Don't write leading zeros in display mode
-			lcd_set_DDRAM(addresses[pos]);
-			lcd_write_char(buffer[pos]);			
-		}
+		char c = buffer[pos];
+		if (mode==DISPLAY_MODE && pos==0 && c=='0') c = ' '; //Blank the leading zero (overwrite, don't skip)
+		lcd_set_DDRAM(addresses[pos]);
+		lcd_write_char(c);
 	}
-	
 }
 
 
