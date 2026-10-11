@@ -1,6 +1,8 @@
 #ifndef ROT_ENCODER_H
 #define ROT_ENCODER_H
 
+#include <stdint.h>
+
 /* setpoint change per encoder click (matches the display's 0.01 resolution) */
 #define RESOLUTION 0.01f
 
@@ -14,9 +16,9 @@ extern float Cset;
 extern float Vmon;
 extern float Cmon;
 
-void encoder_init(void);
-void Vencoder_poll(void);
-void Cencoder_poll(void);
-void vals_reset(void);
+void    encoder_init(void);     /* call before sei(): sets up the knob interrupts */
+uint8_t encoders_poll(void);    /* applies knob turns to Vset/Cset; returns 1 if either changed */
+void    encoders_clear(void);   /* throws away turns that haven't been applied yet */
+void    vals_reset(void);
 
 #endif
