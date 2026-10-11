@@ -242,8 +242,6 @@ avr-objcopy -O ihex -R .eeprom power_supply.elf power_supply.hex
 
 ---
 
-## Author
 
 **Tarik** · Electrical & Computer Engineering · [GitHub @tarik8mohamed-ux](https://github.com/tarik8mohamed-ux)
 
-LinkedIn: _add link_ · Email: _add address_
