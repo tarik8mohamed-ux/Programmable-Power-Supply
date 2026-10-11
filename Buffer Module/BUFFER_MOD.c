@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <avr/interrupt.h>
 #include <string.h>
+#include "BUFFER_MOD.h"
 
 int LEFT_SHIFT = 1;
 int RIGHT_SHIFT = 0;
@@ -64,7 +65,7 @@ double buffer_to_val(char buffer[4]){
 	double val = 0;
 	double factor = 10;
 	for (int pos=0; pos<4; pos++){
-		val = val + (factor) * (buffer[pos]);
+		val = val + (factor) * (buffer[pos] - '0');   // '7' -> 7
 		factor = factor/10;
 	}
 	
@@ -82,7 +83,9 @@ double buffer_to_val(char buffer[4]){
 ------------------------------------------------------------------------------
 */
 void val_to_buffer(char buffer[4], float val){
-	int num = (val * 100); //9.00-->900
+	if (val < 0.0f)   val = 0.0f;          // display range is 00.00-99.99
+	if (val > 99.99f) val = 99.99f;
+	int num = (int)(val * 100.0f + 0.5f);  //9.00-->900, rounded
 	buffer[0] = ((num / 1000) % 10) + '0';  // tens
 	buffer[1] = ((num / 100)  % 10) + '0';  // ones
 	buffer[2] = ((num / 10)   % 10) + '0';  // tenths

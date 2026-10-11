@@ -26,7 +26,7 @@ void lcd_set_DDRAM (uint8_t address);
 void lcd_write_char(char letter);
 void lcd_write_string (uint8_t line, char* str);
 
-void lcd_buffer_to_address(char buffer[4], uint8_t addresses[4] ,int mode);
+void lcd_buffer_to_address(char buffer[4], const uint8_t addresses[4], int mode);
 void lcd_write_all_buffers(void);
 
 void lcd_insert(char input, int mode);

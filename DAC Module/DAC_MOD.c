@@ -16,8 +16,15 @@
 
 
 /* DAC Properties */
-#define VREF  2.5
-#define GAIN  2
+/* DAC Properties */
+#define DAC_VREF        2.5f                    /* internal ref (VREF is already the AVR's VREF peripheral) */
+#define DAC_GAIN        2.0f                    /* AD5623R-5 output gain */
+#define DAC_FULL_SCALE  (DAC_VREF * DAC_GAIN)   /* 5.0 V */
+#define CV_GAIN         4.8f                    /* CV amp gain: 1 + R16/R14 = 1 + 3.8k/1k */
+
+/* DAC frame-select pin */
+#define SYNC_PORT  PORTA
+#define SYNC_PIN   PIN7_bm
 
 /* Address Commands */
 #define DAC_V   0x00  
@@ -63,12 +70,12 @@ uint32_t dac_SetData(uint32_t Command, uint32_t Address, uint32_t DataBus){
 		uint32_t data: 24bit information sent to DAC
 ---------------------------------------------------------
 */
-void dac_SendData( uint32_t data){
-	int shift = 16;
-	for(int i=0; i<3; i++){
-		SPI0_SendData(data >> shift);
-		shift = shift - 8;
-	}
+void dac_SendData(uint32_t data){
+	SYNC_PORT.OUTCLR = SYNC_PIN;               // SYNC low: start of 24-bit frame
+	SPI0_SendData((uint8_t)(data >> 16));
+	SPI0_SendData((uint8_t)(data >> 8));
+	SPI0_SendData((uint8_t)data);
+	SYNC_PORT.OUTSET = SYNC_PIN;               // SYNC high: DAC latches the frame
 }
 
 
@@ -106,10 +113,11 @@ void dac_init(void){
 		Vout: a number from 0-VREF
 ------------------------------------------------------------
 */
-int dac_Calculate_Dval(float Vout){
-	
-	int Dval = (int)(4095 * Vout / (VREF * GAIN) );
-	return  Dval;
+uint32_t dac_Calculate_Dval(float Vout){
+	if (Vout < 0.0f) Vout = 0.0f;                      // keep inside 0-5 V
+	if (Vout > DAC_FULL_SCALE) Vout = DAC_FULL_SCALE;
+	uint32_t code = (uint32_t)(Vout * 4095.0f / DAC_FULL_SCALE + 0.5f);
+	return code << 4;                                  // 12-bit code sits in DB15..DB4
 }
 
 
@@ -121,10 +129,8 @@ int dac_Calculate_Dval(float Vout){
 		Voltage: a number from 0-VREF
 ------------------------------------------------------------
 */
-void dac_Vset(float Voltage){
-	
-	int Dval = dac_Calculate_Dval(Voltage); 
-	uint32_t data = dac_SetData(WRITE_INPUT_REG, DAC_V, Dval);
+void dac_Vset(float Voltage){                          // volts wanted at the output jacks
+	uint32_t data = dac_SetData(WRITE_INPUT_REG, DAC_V, dac_Calculate_Dval(Voltage / CV_GAIN));
 	dac_SendData(data);
 }
 
@@ -137,10 +143,8 @@ void dac_Vset(float Voltage){
 		Voltage: a number from 0-VREF
 ------------------------------------------------------------
 */
-void dac_Cset(float Current){
-	
-	int Dval = dac_Calculate_Dval(Current);
-	uint32_t data = dac_SetData(WRITE_INPUT_REG, DAC_C, Dval);
+void dac_Cset(float Current){                          // amps; the CC amp sees IMON at 1 V per amp
+	uint32_t data = dac_SetData(WRITE_INPUT_REG, DAC_C, dac_Calculate_Dval(Current));
 	dac_SendData(data);
 }
 

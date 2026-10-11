@@ -6,13 +6,12 @@
  */ 
 
 #include <avr/io.h>
+#define F_CPU 4000000UL
+#include <util/delay.h>
 #include "KEYPAD_MOD.h"
 
-
-/* Replace with your library code */
-
 #define KEYPAD_DATA_PORT PORTC
-#define STABLE_COUNT_REQUIRED 7 // number of consecutive reads required
+#define STABLE_COUNT_REQUIRED 50 // consecutive identical scans (~0.2 ms each, so ~10 ms) before a key counts
 
 /*
 ---------------------------------------------------------------
@@ -21,10 +20,28 @@ Description: Sets all row pins to outputs & HIGH, all col pins to inputs & HIGH
 */
 void keypad_init(void){
 	KEYPAD_DATA_PORT.DIR = 0x0F; //Rows=OUTPUTS, Cols=INPUTS
-	KEYPAD_DATA_PORT.OUT = 0xFF; //Rows,Cols = HIGH
+	KEYPAD_DATA_PORT.OUT = 0xFF; //Rows = HIGH
+	KEYPAD_DATA_PORT.PIN4CTRL = PORT_PULLUPEN_bm; //Cols need pull-ups: on AVR Dx, OUT=1 does not enable them
+	KEYPAD_DATA_PORT.PIN5CTRL = PORT_PULLUPEN_bm;
+	KEYPAD_DATA_PORT.PIN6CTRL = PORT_PULLUPEN_bm;
+	KEYPAD_DATA_PORT.PIN7CTRL = PORT_PULLUPEN_bm;
+}
+		
+static Coordinate last_pressed = {5, 5};   // key seen on the previous scan
+static int stable_count = 0;               // scans in a row it has stayed the same
+
+/*
+---------------------------------------------------------------
+Description: Forgets the last key so the next press always counts.
+             Call when starting an edit.
+---------------------------------------------------------------
+*/
+void keypad_reset(void){
+	last_pressed.row = 5;
+	last_pressed.col = 5;
+	stable_count = 0;
 }
 
-		
 /*
 ----------------------------------------------------------------------------
 Returns Coordinate of button if one is pressed, junk Coordinate otherwise
@@ -32,8 +49,6 @@ Returns Coordinate of button if one is pressed, junk Coordinate otherwise
 */
 Coordinate scan_key() {
 
-	static Coordinate last_pressed = {5, 5}; 
-	static int stable_count = 0;             
 
 	keypad_init();  
 
@@ -55,21 +70,16 @@ Coordinate scan_key() {
 		KEYPAD_DATA_PORT.OUT |= row_mask;    // restore row HIGH
 	}
 	
-//Stability Debouncing
-if (current.row == last_pressed.row && current.col == last_pressed.col) { // Current key is the same as last read
-	
-    if (current.row != 5) {
-        stable_count++;
-        if (stable_count >= STABLE_COUNT_REQUIRED) {
-            return current;
-        }
-    } 
-	else {
-        stable_count = 0;
-    }
-} 
+if (current.row == last_pressed.row && current.col == last_pressed.col) { // same key as last scan
+	if (current.row != 5 && stable_count < STABLE_COUNT_REQUIRED) {
+		stable_count++;
+		if (stable_count == STABLE_COUNT_REQUIRED) {
+			return current;   // fires once per press; held keys don't repeat
+		}
+	}
+}
 else {
-    stable_count = 0;
+	stable_count = 0;         // key changed or released: start counting again
 }
 
 // Update last_pressed for next function call
@@ -89,14 +99,14 @@ Precondition: button is a Coordinate type such that both its values are 0-4
 ----------------------------------------------------------------------------
 */
 int keypad_pressed(Coordinate button){
-		
-		int keypad_map[4][4] = {
-			{1, 2, 3, 'A'},
-			{4, 5, 6, 'B'},
-			{7, 8, 9, 'C'},
-			{'D', 0, 'E', '.'}
+	
+	static const char keypad_map[4][4] = {
+			{'1', '2', '3', 'A'},
+			{'4', '5', '6', 'B'},
+			{'7', '8', '9', 'C'},
+			{'D', '0', 'E', '.'}
 		};
-		return keypad_map[button.row][button.col];
+	return keypad_map[button.row][button.col];
 }
 
 
@@ -109,11 +119,10 @@ Precondition: button is an int
 ----------------------------------------------------------------------------
 */
 int key_state(int input){
-	if (input >= 0 && input <= 9) return 1;
-	if (input == 'D') return 2;
-	if (input == 'E') return 3
-	if (input == 'C') return 4;
-	else return 5;
-	
+	if (input >= '0' && input <= '9') return 1;   // digit
+	if (input == 'D') return 2;                   // delete
+	if (input == 'E') return 3;                   // enter
+	if (input == 'C') return 4;                   // cancel
+	return 5;                                     // A, B, '.' unused
 }
 

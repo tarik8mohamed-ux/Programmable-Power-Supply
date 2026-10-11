@@ -18,7 +18,7 @@ extern char CmonBuffer[4];
 
 void buffer_update(char buffer[4], char input, int mode);
 
-int  buffer_to_val(char buffer[4]);
+double  buffer_to_val(char buffer[4]);
 void val_to_buffer(char buffer[4], float num);
 
 void buffer_copy(char original[4], char new[4]);

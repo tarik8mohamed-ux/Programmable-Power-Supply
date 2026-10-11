@@ -16,14 +16,14 @@
 
 void ADC_init(uint8_t mode)
 {	
-	// Use 2.048V as reference
-	VREF.ADC0REF = VREF_REFSEL_2V048_gc;
+  	// Use 4.096V as reference (covers 24 V / 10 = 2.4 V and 3 A x 1 V/A = 3 V)
+  	VREF.ADC0REF = VREF_REFSEL_4V096_gc;
 	
 	// 12-bit resolution, Free-Run mode, differential/single-ended, Right adjusted, Enable
 	ADC0.CTRLA = (ADC_RESSEL_12BIT_gc | (ADC_FREERUN_bm) | (mode << 5) | ADC_ENABLE_bm);
 
 	//enables interrupt
-	ADC0.INTCTRL |= ADC_RESRDY_bm;
+	//ADC0.INTCTRL |= ADC_RESRDY_bm;
 
 	// Set to accumulate 64 samples
 	ADC0.CTRLB = ADC_SAMPNUM_ACC64_gc;
@@ -130,7 +130,7 @@ float ADC_read(void)
 	
 	while(ADC_isConversionDone() != 0x01);	// wait for conversion to finish
 	ADC_stopConversion();
-	float adc_vref = 2.048;
+	float adc_vref = 4.096;
 	/* 12 bit result was left adjusted, so shift right 4 places to fix, reading ADC.RES clears interrupt flag */	
 	return (float)(adc_vref * (ADC0.RES >> 4) / 4096);	// single-ended resolution is 12 bits -> 4096 values	
 }
