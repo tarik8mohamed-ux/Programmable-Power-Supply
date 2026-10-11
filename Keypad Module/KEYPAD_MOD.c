@@ -6,13 +6,10 @@
  */ 
 
 #include <avr/io.h>
+#define F_CPU 4000000UL
+#include <util/delay.h>
 #include "KEYPAD_MOD.h"
-#include <util/delay.h>
-#define F_CPU 4000000UL
-#include <util/delay.h>
 
-/* Replace with your library code */
-#define F_CPU 4000000UL
 #define KEYPAD_DATA_PORT PORTC
 #define STABLE_COUNT_REQUIRED 50 // consecutive identical scans (~0.2 ms each, so ~10 ms) before a key counts
 
@@ -30,6 +27,21 @@ void keypad_init(void){
 	KEYPAD_DATA_PORT.PIN7CTRL = PORT_PULLUPEN_bm;
 }
 		
+static Coordinate last_pressed = {5, 5};   // key seen on the previous scan
+static int stable_count = 0;               // scans in a row it has stayed the same
+
+/*
+---------------------------------------------------------------
+Description: Forgets the last key so the next press always counts.
+             Call when starting an edit.
+---------------------------------------------------------------
+*/
+void keypad_reset(void){
+	last_pressed.row = 5;
+	last_pressed.col = 5;
+	stable_count = 0;
+}
+
 /*
 ----------------------------------------------------------------------------
 Returns Coordinate of button if one is pressed, junk Coordinate otherwise
@@ -37,8 +49,6 @@ Returns Coordinate of button if one is pressed, junk Coordinate otherwise
 */
 Coordinate scan_key() {
 
-	static Coordinate last_pressed = {5, 5}; 
-	static int stable_count = 0;             
 
 	keypad_init();  
 

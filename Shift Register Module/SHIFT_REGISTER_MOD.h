@@ -7,5 +7,6 @@ void CV_ON(void);
 void CC_ON(void);
 void VSET_ON(void);
 void CSET_ON(void);
+void SET_LEDS_OFF(void);
 
 #endif

@@ -83,7 +83,9 @@ double buffer_to_val(char buffer[4]){
 ------------------------------------------------------------------------------
 */
 void val_to_buffer(char buffer[4], float val){
-	int num = (val * 100); //9.00-->900
+	if (val < 0.0f)   val = 0.0f;          // display range is 00.00-99.99
+	if (val > 99.99f) val = 99.99f;
+	int num = (int)(val * 100.0f + 0.5f);  //9.00-->900, rounded
 	buffer[0] = ((num / 1000) % 10) + '0';  // tens
 	buffer[1] = ((num / 100)  % 10) + '0';  // ones
 	buffer[2] = ((num / 10)   % 10) + '0';  // tenths
